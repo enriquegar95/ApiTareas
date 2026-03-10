@@ -1,50 +1,68 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16
     container_name: bd_api_tareas
     env_file:
-      - .env
+      - ./backend/.env
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
 
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api_tareas_migrate
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /app
+    command: alembic upgrade head
+    volumes:
+      - ./backend:/app
+    restart: "no"
+
   api:
     build:
-      context: .
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: api-tareas
     env_file:
-      - .env
+      - ./backend/.env
     ports:
       - "8000:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
     volumes:
-      - ./:/app:rw
+      - ./backend:/app
     restart: unless-stopped
 
-  migrate:
+  frontend:
     build:
-      context: .
-    container_name: api_tareas_migrate
-    env_file:
-      - .env
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend_api_tareas
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
     depends_on:
-      db:
-        condition: service_healthy
-    working_dir: /app
-    command: alembic upgrade head
-    restart: "no"
+      - api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
 
   pgadmin:
     image: dpage/pgadmin4
@@ -52,10 +70,10 @@ services:
     ports:
       - "8080:80"
     env_file:
-      - .env
+      - ./backend/.env
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
