@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     # App
     project_name: str = "API Tareas"
     api_prefix: str = "/api/v1"
-    environment: str = "dev"
+    environment: str = "production"
 
     # Database
     database_url: str
